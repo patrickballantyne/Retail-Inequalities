@@ -6,13 +6,19 @@ library(lubridate)
 library(vroom)
 library(corrplot)
 library(extrafont)
+install.packages("qdapRegex")
+library(qdapRegex)
 options(scipen = 999)
+class_lvls <- c("Regional Centre",
+                "Major Town Centre",
+                "Town Centre", 
+                "District Centre",
+                "Market Town",
+                "Local Centre")
+# font_import()
+# loadfonts(device = "win", quiet = TRUE)
+# windowsFonts(Times = windowsFont("Times New Roman"))
 
-font_import()
-loadfonts(device = "win", quiet = TRUE)
-windowsFonts(Times = windowsFont("Times New Roman"))
-
-fonts()
 # 1. Data -----------------------------------------------------------------
 
 ## COVID-19 Cases --------
@@ -38,9 +44,15 @@ cvWeek <- cv %>%
 
 ## Read in and prepare daily measure
 dat <- read.csv("Input Data/MobilityAggregates.csv.csv")
+
+DAT_SUB <- dat %>%
+  filter(RC_ID == "RC_SC_1")
+
 dat <- dat %>%
   mutate(Date = as.Date(Date, format = "%d/%m/%Y")) 
 
+l <- dat %>%
+  filter(grepl("RC_SC", RC_ID))
 ## Retail Centre Data -------------
 
 ### Safeguarded indicators
@@ -112,6 +124,27 @@ chgRC <- input %>%
 ## Calculate change (Functional level)
 chgFunc <- merge(chgRC, indDesc, by = "RC_ID", all.x = TRUE)
 
+## Calculate trends by different LADs
+nuts_list <- c("London (England)",  "Wales", "Scotland", "North West (England)",  "South East (England)", 
+               "South West (England)")
+rc <- st_read("Input Data/CDRC_RetailCentre_WalkingDeprivation_v2.gpkg")
+rc <- rc %>%
+  select(RC_ID, RC_Name, Classification, geom) %>%
+  filter(Classification %in% class_lvls) %>%
+  filter(grepl('London|Scotland|Wales|North West||South East|South West|', RC_Name)) %>%
+  mutate(Region = RC_Name,
+         Region = qdapRegex::rm_between(Region, '(', ')', extract = TRUE))
+rc_df <- rc %>%
+  as.data.frame() %>%
+  select(RC_ID, Region) %>%
+  mutate(Region = as.character(Region),
+         Region = factor(Region, levels = c("London; England", "South East; England", "South West; England", "North West; England",
+                                            "England",  "Wales", "Scotland"))) %>%
+  filter(!is.na(Region))
+
+chgReg <- merge(chgFunc, rc_df, by = "RC_ID", all.x = TRUE)
+chgReg <- chgReg %>%
+  filter(!is.na(Region))
 
 # 3. Data Visualisation 1) COVID-19 and National Activity -----------------
 
@@ -176,7 +209,7 @@ p3 <- chgRC %>%
 ## Assemble
 ggarrange(p1, p3, nrow = 2)
 
-# 4. Data Visualisation 2) Functional Analyses ----------------------------
+# 4. Data Visualisation 2) Functional Analyses and Regions ----------------------------
 
 chgFunc %>%
   mutate(Classification = factor(Classification, levels = c("Regional Centre",
@@ -220,8 +253,22 @@ chgFunc %>%
         axis.title = element_text(size = 12, face = "bold"),
         axis.text = element_text(size = 12))
 
+chgReg %>%
+  ggplot(aes(x = WeekDate, y = avgAi, color = Classification)) +
+  geom_smooth() +
+  ylab("Average Ai") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
+  geom_vline(xintercept = as.Date("2022-02-14"), color = "red", lwd = 2) +
+  geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
+  theme_bw() +
+  theme(text = element_text(family = "Times"),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12)) +
+  facet_wrap(~ Region, scales = "free", ncol = 2)
 
 
 # 5. Data Visualisation 3) Structural Analysis ----------------------------
-
-
+head(chgReg)
+## 
