@@ -11,7 +11,7 @@ library(cowplot)
 # 1. Data -----------------------------------------------------------------
 
 ## Read in the retail centre
-rc <- st_read("Output Data/LL.gpkg")
+rc <- st_read("LL.gpkg")
 
 ## Polyfill
 rc_h3 <- polyfill(rc, 11, simple = FALSE)
@@ -68,7 +68,7 @@ n3 <- ggplot() +
   theme_bw() +
   labs(title = "C) Lodge Lane, Liverpool",
        subtitle = "H3 cell activity",
-       caption = "Raw number of devices \n(generate randomly)") +
+       caption = "Raw number of devices \n(generated randomly)") +
   theme(text = element_text(family = "Times"),
         axis.text = element_blank(),
         plot.title = element_text(size = 11, face = "bold"),
@@ -91,4 +91,13 @@ n4 <- ggplot() +
 legend <- get_legend(n3)
 n3 <- n3 +
   theme(legend.position = "none")
-grid.arrange(n1, n2, n3, legend, n4, nrow = 1)
+grid.arrange(n1, n2, n3, n4, nrow = 2, ncol = 2)
+
+n1
+ggsave("Outputs and Figures/Figure 2/n1.tiff", dpi = 300)
+n2
+ggsave("Outputs and Figures/Figure 2/n2.tiff", dpi = 300)
+n3
+ggsave("Outputs and Figures/Figure 2/n3.tiff", dpi = 300)
+n4
+ggsave("Outputs and Figures/Figure 2/n4.tiff", dpi = 300)

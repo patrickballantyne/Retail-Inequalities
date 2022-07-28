@@ -45,6 +45,8 @@ dat <- dat %>%
 
 ### Safeguarded indicators
 ind <- read.csv("Input Data/CDRC_RetailCentre_Indicators.csv")
+indDesc <- ind %>%
+  select(RC_ID, Classification)
 ind <- ind %>%
   filter(!is.na(pctCloneTown)) %>%
   select(RC_ID, 
@@ -98,6 +100,17 @@ chg <- input %>%
          pctChange = (avgAi/base$avgAi - 1) * 100) %>%
   filter(WeekDate >= "2021-08-02")
 
+## Calculate change from baseline (Retail centre level)
+chgRC <- input %>%
+  mutate(WeekDate = floor_date(Date - 1, "weeks") + 1) %>%
+  select(RC_ID, Classification, WeekDate, Ai) %>%
+  group_by(WeekDate, RC_ID) %>%
+  summarise(avgAi = mean(Ai)) %>%
+  ungroup() %>%
+  filter(WeekDate >= "2021-09-06")
+
+## Calculate change (Functional level)
+chgFunc <- merge(chgRC, indDesc, by = "RC_ID", all.x = TRUE)
 
 
 # 3. Data Visualisation 1) COVID-19 and National Activity -----------------
@@ -127,7 +140,6 @@ p1 <- ggplot(cvWeek) +
         axis.text = element_text(size = 12),
         legend.position = "none")
 
-
 p2<- chg %>%
   filter(WeekDate >= "2021-09-06") %>%
   ggplot() +
@@ -146,4 +158,70 @@ p2<- chg %>%
         axis.text = element_text(size = 12),
         legend.position = "none")
 
-ggarrange(p1, p2, nrow = 2, labels = c("A", "B"))
+p3 <- chgRC %>%
+  ggplot(aes(x = WeekDate, y = avgAi)) +
+  geom_smooth(color = "black") +
+  ylab("Average Ai") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%Y") +
+  geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
+  geom_vline(xintercept = as.Date("2022-02-14"), color = "red", lwd = 2) +
+  geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
+  theme_bw() +
+  theme(text = element_text(family = "Times"),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        legend.position = "none")
+
+## Assemble
+ggarrange(p1, p3, nrow = 2)
+
+# 4. Data Visualisation 2) Functional Analyses ----------------------------
+
+chgFunc %>%
+  mutate(Classification = factor(Classification, levels = c("Regional Centre",
+                                                            "Major Town Centre",
+                                                            "Town Centre", 
+                                                            "District Centre",
+                                                            "Market Town",
+                                                            "Local Centre"))) %>%
+  ggplot(aes(x = WeekDate, y = avgAi)) +
+  geom_smooth(color = "black") +
+  ylab("Average Ai") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%Y") +
+  geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
+  geom_vline(xintercept = as.Date("2022-02-14"), color = "red", lwd = 2) +
+  geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
+  theme_bw() +
+  theme(text = element_text(family = "Times"),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12)) +
+  facet_wrap(~ Classification, ncol = 2)
+
+
+chgFunc %>%
+  mutate(Classification = factor(Classification, levels = c("Regional Centre",
+                                                            "Major Town Centre",
+                                                            "Town Centre", 
+                                                            "District Centre",
+                                                            "Market Town",
+                                                            "Local Centre"))) %>%
+  ggplot(aes(x = WeekDate, y = avgAi, group = Classification, color = Classification)) +
+  geom_smooth() +
+  ylab("Average Ai") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%Y") +
+  geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
+  geom_vline(xintercept = as.Date("2022-02-14"), color = "red", lwd = 2) +
+  geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
+  theme_bw() +
+  theme(text = element_text(family = "Times"),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12))
+
+
+
+# 5. Data Visualisation 3) Structural Analysis ----------------------------
+
+
