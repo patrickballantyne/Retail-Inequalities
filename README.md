@@ -17,6 +17,8 @@ The paper has three aims:
 
 The primary dataset used in this project is the *Geolytix aggregated in-app location dataset*, which is available via the CDRC; more information can be found [HERE](https://data.cdrc.ac.uk/dataset/geolytix-aggregated-app-location-dataset).
 
+
+
 We have integrated the mobility dataset with the CDRC retail centres data product, specifically the boundaries and accompanying indicators, which can be found [HERE](https://data.cdrc.ac.uk/dataset/retail-centre-boundaries-and-open-indicators). 
 
 ---
