@@ -6,7 +6,6 @@ library(lubridate)
 library(vroom)
 library(corrplot)
 library(extrafont)
-install.packages("qdapRegex")
 library(qdapRegex)
 options(scipen = 999)
 class_lvls <- c("Regional Centre",
@@ -15,9 +14,10 @@ class_lvls <- c("Regional Centre",
                 "District Centre",
                 "Market Town",
                 "Local Centre")
-# font_import()
-# loadfonts(device = "win", quiet = TRUE)
-# windowsFonts(Times = windowsFont("Times New Roman"))
+windowsFonts(Times = windowsFont("Times New Roman"))
+cbp2 <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2")
+source("Source Code/Helper Functions.R")
 
 # 1. Data -----------------------------------------------------------------
 
@@ -43,16 +43,10 @@ cvWeek <- cv %>%
 ## Geolytix Mobility Data ---------
 
 ## Read in and prepare daily measure
-dat <- read.csv("Input Data/MobilityAggregates.csv.csv")
-
-DAT_SUB <- dat %>%
-  filter(RC_ID == "RC_SC_1")
-
+dat <- vroom("Input Data/MobilityAggregates_v2.csv")
 dat <- dat %>%
-  mutate(Date = as.Date(Date, format = "%d/%m/%Y")) 
+  mutate(Date = as.Date(Date))
 
-l <- dat %>%
-  filter(grepl("RC_SC", RC_ID))
 ## Retail Centre Data -------------
 
 ### Safeguarded indicators
@@ -131,20 +125,29 @@ rc <- st_read("Input Data/CDRC_RetailCentre_WalkingDeprivation_v2.gpkg")
 rc <- rc %>%
   select(RC_ID, RC_Name, Classification, geom) %>%
   filter(Classification %in% class_lvls) %>%
-  filter(grepl('London|Scotland|Wales|North West||South East|South West|', RC_Name)) %>%
+  filter(grepl('London|Scotland|Wales|North West|North East|South East|South West|East Midlands|Yorkshire and The Humber', RC_Name)) %>%
   mutate(Region = RC_Name,
          Region = qdapRegex::rm_between(Region, '(', ')', extract = TRUE))
 rc_df <- rc %>%
   as.data.frame() %>%
   select(RC_ID, Region) %>%
   mutate(Region = as.character(Region),
-         Region = factor(Region, levels = c("London; England", "South East; England", "South West; England", "North West; England",
-                                            "England",  "Wales", "Scotland"))) %>%
-  filter(!is.na(Region))
+         Region = factor(Region, levels = c("London; England", "South East; England",
+                                            "South West; England", "East Midlands; England",
+                                            "North West; England", "North East; England",
+                                            "Yorkshire and The Humber; England", "Wales", "Scotland")))
 
 chgReg <- merge(chgFunc, rc_df, by = "RC_ID", all.x = TRUE)
 chgReg <- chgReg %>%
-  filter(!is.na(Region))
+  filter(!is.na(Region)) %>%
+  mutate(Region = gsub("\\;.*", "", Region)) %>%
+  mutate(Region = factor(Region, levels = c("London", "South East",
+                                           "South West", "East Midlands",
+                                           "North West", "North East",
+                                           "Yorkshire and The Humber", "Wales", "Scotland")))
+
+## Input for structural analysis
+head(input)
 
 # 3. Data Visualisation 1) COVID-19 and National Activity -----------------
 
@@ -167,11 +170,17 @@ p1 <- ggplot(cvWeek) +
   geom_label(aes(x = as.Date("2022-05-20"), y = 7.5,
                  label = "20th May:\nOmicron BA.4 and BA.5\ndeclared as VOC",
                  size = 4, family = "Times")) +
+  geom_segment(aes(x = as.Date("2021-12-06"), y= 12, xend = as.Date("2022-01-31"), yend = 12),
+               arrow = arrow(ends = "both", length = unit(0.2, "cm"))) +
+  geom_label(aes(x = as.Date("2022-01-06"), y = 12.5,
+                 label = "'Plan B' measures in effect",
+                 size = 4, family = "Times")) +
   theme_bw() +
   theme(text = element_text(family = "Times"),
-        axis.title = element_text(size = 12, face = "bold"),
+        axis.title = element_text(size = 12),
         axis.text = element_text(size = 12),
         legend.position = "none")
+p1
 
 p2<- chg %>%
   filter(WeekDate >= "2021-09-06") %>%
@@ -194,7 +203,7 @@ p2<- chg %>%
 p3 <- chgRC %>%
   ggplot(aes(x = WeekDate, y = avgAi)) +
   geom_smooth(color = "black") +
-  ylab("Average Ai") +
+  ylab(bquote("Average A"["it"])) +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b-%Y") +
   geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
@@ -202,36 +211,15 @@ p3 <- chgRC %>%
   geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
   theme_bw() +
   theme(text = element_text(family = "Times"),
-        axis.title = element_text(size = 12, face = "bold"),
+        axis.title = element_text(size = 12),
         axis.text = element_text(size = 12),
         legend.position = "none")
+p3
 
 ## Assemble
 ggarrange(p1, p3, nrow = 2)
-
+ggsave("Outputs and Figures/Figure 2_NEW_v2.tiff", width = 14, height = 12)
 # 4. Data Visualisation 2) Functional Analyses and Regions ----------------------------
-
-chgFunc %>%
-  mutate(Classification = factor(Classification, levels = c("Regional Centre",
-                                                            "Major Town Centre",
-                                                            "Town Centre", 
-                                                            "District Centre",
-                                                            "Market Town",
-                                                            "Local Centre"))) %>%
-  ggplot(aes(x = WeekDate, y = avgAi)) +
-  geom_smooth(color = "black") +
-  ylab("Average Ai") +
-  xlab("Date") +
-  scale_x_date(date_breaks = "1 month", date_labels = "%b-%Y") +
-  geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
-  geom_vline(xintercept = as.Date("2022-02-14"), color = "red", lwd = 2) +
-  geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
-  theme_bw() +
-  theme(text = element_text(family = "Times"),
-        axis.title = element_text(size = 12, face = "bold"),
-        axis.text = element_text(size = 12)) +
-  facet_wrap(~ Classification, ncol = 2)
-
 
 chgFunc %>%
   mutate(Classification = factor(Classification, levels = c("Regional Centre",
@@ -242,7 +230,8 @@ chgFunc %>%
                                                             "Local Centre"))) %>%
   ggplot(aes(x = WeekDate, y = avgAi, group = Classification, color = Classification)) +
   geom_smooth() +
-  ylab("Average Ai") +
+  scale_color_manual(values = cbp2) +
+  ylab(bquote("Average A"["it"])) +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b-%Y") +
   geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
@@ -250,13 +239,28 @@ chgFunc %>%
   geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
   theme_bw() +
   theme(text = element_text(family = "Times"),
-        axis.title = element_text(size = 12, face = "bold"),
-        axis.text = element_text(size = 12))
+        axis.title = element_text(size = 14, face = "bold"),
+        axis.text = element_text(size = 12),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14, face = "bold"),
+        legend.text.align = 0)
+
+
+
+
+ggsave("Outputs and Figures/Figure 3.tiff", width = 14, height = 12)
 
 chgReg %>%
+  mutate(Classification = factor(Classification, levels = c("Regional Centre",
+                                                            "Major Town Centre",
+                                                            "Town Centre", 
+                                                            "District Centre",
+                                                            "Market Town",
+                                                            "Local Centre"))) %>%
   ggplot(aes(x = WeekDate, y = avgAi, color = Classification)) +
   geom_smooth() +
-  ylab("Average Ai") +
+  scale_color_manual(values = cbp2) +
+  ylab(bquote("Average A"["it"])) +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b") +
   geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
@@ -264,11 +268,21 @@ chgReg %>%
   geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
   theme_bw() +
   theme(text = element_text(family = "Times"),
-        axis.title = element_text(size = 12, face = "bold"),
-        axis.text = element_text(size = 12)) +
-  facet_wrap(~ Region, scales = "free", ncol = 2)
-
-
+        axis.title = element_text(size = 14, face = "bold"),
+        axis.text = element_text(size = 12),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14, face = "bold"),
+        legend.text.align = 0) +
+  facet_wrap(~ Region, scales = "free", ncol = 3)
+ggsave("Outputs and Figures/Figure 4.tiff", width = 14, height = 12)
 # 5. Data Visualisation 3) Structural Analysis ----------------------------
-head(chgReg)
-## 
+
+## Comparison plot 
+compPlot("propVacant")
+compPlot("eResilience")
+compPlot("pctCloneTown")
+compPlot("AvgIMDScore")
+compPlot("propComparison")
+compPlot("propConvenience")
+
+ggsave("Outputs and Figures/Figure 6.tiff", width = 16, height = 8)
