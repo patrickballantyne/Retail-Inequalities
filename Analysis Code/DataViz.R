@@ -14,6 +14,9 @@ class_lvls <- c("Regional Centre",
                 "District Centre",
                 "Market Town",
                 "Local Centre")
+nuts_list <- c("London (England)",  "Wales", "Scotland",
+               "North West (England)",  "South East (England)", 
+               "South West (England)")
 windowsFonts(Times = windowsFont("Times New Roman"))
 cbp2 <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
           "#F0E442", "#0072B2")
@@ -22,30 +25,37 @@ source("Source Code/Helper Functions.R")
 # 1. Data -----------------------------------------------------------------
 
 ## COVID-19 Cases --------
-cv <- read.csv("Input Data/UK_CovidRates_Updated.csv.csv")
+cv <- read.csv("Input Data/UK_CovidRates_v3.csv")
 cvDay <- cv %>%
+  select(date, newCasesBySpecimenDate) %>%
+  setNames(c("Date", "newCases")) %>%
   mutate(Date = as.character(Date)) %>%
-  mutate(Date = as.Date(Date, format = "%d/%m/%Y")) %>% 
+  mutate(Date = as.Date(Date)) %>% 
   select(Date, newCases) %>%
+  filter(Date >= "2021-08-01" & Date <= "2022-07-31") %>%
+  mutate(newCases = newCases / 1000,
+         newCases = round(newCases, 0)) %>% 
   arrange(Date)
-cvWeek <- cv %>% 
-  mutate(Date = as.character(Date)) %>%
-  mutate(Date = as.Date(Date, format = "%d/%m/%Y")) %>% 
-  mutate(WeekDate = floor_date(Date - 1, "weeks") + 1) %>%
-  select(Date, WeekDate, newCases) %>%
-  arrange(Date) %>%
-  group_by(WeekDate) %>%
-  summarise(weekCases = sum(newCases)) %>%
-  mutate(weekCases = weekCases / 100000) %>%
-  filter(WeekDate >= "2021-09-06" & WeekDate <= "2022-06-27")
-
+# cvWeek <- cv %>% 
+#   mutate(Date = as.character(Date)) %>%
+#   mutate(Date = as.Date(Date, format = "%d/%m/%Y")) %>% 
+#   mutate(WeekDate = floor_date(Date - 1, "weeks") + 1) %>%
+#   select(Date, WeekDate, newCases) %>%
+#   arrange(Date) %>%
+#   group_by(WeekDate) %>%
+#   summarise(weekCases = sum(newCases)) %>%
+#   mutate(weekCases = weekCases / 100000) %>%
+#   filter(WeekDate >= "2021-09-06" & WeekDate <= "2022-06-27")
 
 ## Geolytix Mobility Data ---------
 
 ## Read in and prepare daily measure
-dat <- vroom("Input Data/MobilityAggregates_v2.csv")
+dat <- vroom("Input Data/MobilityAggregates_v3.csv")
 dat <- dat %>%
   mutate(Date = as.Date(Date))
+datDate <- dat %>%
+  select(Date) %>%
+  distinct()
 
 ## Retail Centre Data -------------
 
@@ -59,6 +69,7 @@ ind <- ind %>%
          n.LDC.2020, propComparison, propConvenience, propLeisure, propService,
          propChain, propIndependent, pctCloneTown, propVacant, PropStructuralVacant,
          propVacantChange, vulnerabilityIndex, onlineExposure, eResilience)
+
 ### Deprivation profiles
 dep <- st_read("Input Data/CDRC_RetailCentre_WalkingDeprivation_v2.gpkg")
 dep <- dep %>%
@@ -82,45 +93,7 @@ input <- input %>%
          AvgIMDScore) %>%
   drop_na()
 
-
-# 2. Data Analysis --------------------------------------------------------
-
-## Calculating baseline of Ai
-base <- input %>%
-  mutate(WeekDate = floor_date(Date - 1, "weeks") + 1) %>%
-  select(RC_ID, Classification, WeekDate, Ai) %>%
-  group_by(WeekDate) %>%
-  summarise(avgAi = mean(Ai)) %>%
-  filter(WeekDate >= "2021-08-02" & WeekDate <= "2021-08-30") %>%
-  summarise(avgAi = mean(avgAi))
-
-## Calculate change from baseline
-chg <- input %>%
-  mutate(WeekDate = floor_date(Date - 1, "weeks") + 1) %>%
-  select(RC_ID, Classification, WeekDate, Ai) %>%
-  group_by(WeekDate) %>%
-  summarise(avgAi = mean(Ai)) %>%
-  ungroup() %>%
-  arrange(WeekDate) %>%
-  mutate(AiChange = avgAi - base$avgAi,
-         pctChange = (avgAi/base$avgAi - 1) * 100) %>%
-  filter(WeekDate >= "2021-08-02")
-
-## Calculate change from baseline (Retail centre level)
-chgRC <- input %>%
-  mutate(WeekDate = floor_date(Date - 1, "weeks") + 1) %>%
-  select(RC_ID, Classification, WeekDate, Ai) %>%
-  group_by(WeekDate, RC_ID) %>%
-  summarise(avgAi = mean(Ai)) %>%
-  ungroup() %>%
-  filter(WeekDate >= "2021-09-06")
-
-## Calculate change (Functional level)
-chgFunc <- merge(chgRC, indDesc, by = "RC_ID", all.x = TRUE)
-
-## Calculate trends by different LADs
-nuts_list <- c("London (England)",  "Wales", "Scotland", "North West (England)",  "South East (England)", 
-               "South West (England)")
+### Attach region
 rc <- st_read("Input Data/CDRC_RetailCentre_WalkingDeprivation_v2.gpkg")
 rc <- rc %>%
   select(RC_ID, RC_Name, Classification, geom) %>%
@@ -137,60 +110,58 @@ rc_df <- rc %>%
                                             "North West; England", "North East; England",
                                             "Yorkshire and The Humber; England", "Wales", "Scotland")))
 
-chgReg <- merge(chgFunc, rc_df, by = "RC_ID", all.x = TRUE)
-chgReg <- chgReg %>%
+input <- merge(input, rc_df, by = "RC_ID", all.x = TRUE)
+input <- input %>%
   filter(!is.na(Region)) %>%
   mutate(Region = gsub("\\;.*", "", Region)) %>%
   mutate(Region = factor(Region, levels = c("London", "South East",
-                                           "South West", "East Midlands",
-                                           "North West", "North East",
-                                           "Yorkshire and The Humber", "Wales", "Scotland")))
+                                            "South West", "East Midlands",
+                                            "North West", "North East",
+                                            "Yorkshire and The Humber", "Wales", "Scotland"))) %>%
+  arrange(RC_ID, Date)
 
-## Input for structural analysis
-head(input)
 
-# 3. Data Visualisation 1) COVID-19 and National Activity -----------------
+# 2. Data Visualisation 1) COVID-19 and National Activity -----------------
 
-p1 <- ggplot(cvWeek) +
-  aes(x = WeekDate, y = weekCases) +
+## Plot 1 - COVID cases over time
+p1 <- ggplot(cvDay) +
+  aes(x = Date, y = newCases) +
   geom_col() +
-  ylab("Weekly COVID-19 cases (100,000s)") +
-  xlab(NULL) +
+  ylab("Daily COVID-19 cases (1000s)") +
+  xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b-%Y") +
-  scale_y_continuous(breaks = seq(0, 12, by = 3)) +
+  scale_y_continuous(breaks = seq(0, 300, by = 50)) +
   geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
   geom_vline(xintercept = as.Date("2022-02-14"), color = "red", lwd = 2) +
   geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
-  geom_label(aes(x = as.Date("2021-11-20"), y = 7.5,
+  geom_label(aes(x = as.Date("2021-11-20"), y = 150,
                  label = "27th November:\nOmicron BA.1 detected",
                  size = 4, family = "Times")) +
-  geom_label(aes(x = as.Date("2022-02-14"), y = 7.5,
+  geom_label(aes(x = as.Date("2022-02-14"), y = 150,
                  label = "14th February:\nOmicron BA.2 detected",
                  size = 4, family = "Times")) +
-  geom_label(aes(x = as.Date("2022-05-20"), y = 7.5,
+  geom_label(aes(x = as.Date("2022-05-20"), y = 150,
                  label = "20th May:\nOmicron BA.4 and BA.5\ndeclared as VOC",
                  size = 4, family = "Times")) +
-  geom_segment(aes(x = as.Date("2021-12-06"), y= 12, xend = as.Date("2022-01-31"), yend = 12),
+  geom_segment(aes(x = as.Date("2021-12-06"), y= 275, xend = as.Date("2022-01-31"), yend = 275),
                arrow = arrow(ends = "both", length = unit(0.2, "cm"))) +
-  geom_label(aes(x = as.Date("2022-01-06"), y = 12.5,
+  geom_label(aes(x = as.Date("2022-01-06"), y = 260,
                  label = "'Plan B' measures in effect",
                  size = 4, family = "Times")) +
   theme_bw() +
   theme(text = element_text(family = "Times"),
-        axis.title = element_text(size = 12),
+        axis.title = element_text(size = 12, face = "bold"),
         axis.text = element_text(size = 12),
         legend.position = "none")
 p1
 
-p2<- chg %>%
-  filter(WeekDate >= "2021-09-06") %>%
-  ggplot() +
-  aes(x = WeekDate, y = pctChange) +
-  geom_col() +
-  ylab("Weekly change in Ai from baseline (%)") +
+## Plot 2 - Daily activity over time
+p3 <- input %>%
+  ggplot(aes(x = Date, y = Ai)) +
+  geom_smooth(color = "black") +
+  ylab(bquote(bold("A"["it"]))) +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b-%Y") +
-  scale_y_continuous(breaks = seq(-60, 20, by = 10)) +
   geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
   geom_vline(xintercept = as.Date("2022-02-14"), color = "red", lwd = 2) +
   geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
@@ -199,39 +170,26 @@ p2<- chg %>%
         axis.title = element_text(size = 12, face = "bold"),
         axis.text = element_text(size = 12),
         legend.position = "none")
-
-p3 <- chgRC %>%
-  ggplot(aes(x = WeekDate, y = avgAi)) +
-  geom_smooth(color = "black") +
-  ylab(bquote("Average A"["it"])) +
-  xlab("Date") +
-  scale_x_date(date_breaks = "1 month", date_labels = "%b-%Y") +
-  geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
-  geom_vline(xintercept = as.Date("2022-02-14"), color = "red", lwd = 2) +
-  geom_vline(xintercept = as.Date("2022-05-20"), color = "red", lwd = 2) +
-  theme_bw() +
-  theme(text = element_text(family = "Times"),
-        axis.title = element_text(size = 12),
-        axis.text = element_text(size = 12),
-        legend.position = "none")
 p3
+
 
 ## Assemble
 ggarrange(p1, p3, nrow = 2)
-ggsave("Outputs and Figures/Figure 2_NEW_v2.tiff", width = 14, height = 12)
+ggsave("Outputs and Figures/Figure 2.tiff", width = 14, height = 12)
+
 # 4. Data Visualisation 2) Functional Analyses and Regions ----------------------------
 
-chgFunc %>%
+input %>%
   mutate(Classification = factor(Classification, levels = c("Regional Centre",
                                                             "Major Town Centre",
                                                             "Town Centre", 
                                                             "District Centre",
                                                             "Market Town",
                                                             "Local Centre"))) %>%
-  ggplot(aes(x = WeekDate, y = avgAi, group = Classification, color = Classification)) +
+  ggplot(aes(x = Date, y = Ai, group = Classification, color = Classification)) +
   geom_smooth() +
   scale_color_manual(values = cbp2) +
-  ylab(bquote("Average A"["it"])) +
+  ylab(bquote(bold("A"["it"]))) +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b-%Y") +
   geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
@@ -244,23 +202,19 @@ chgFunc %>%
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14, face = "bold"),
         legend.text.align = 0)
+ggsave("Outputs and Figures/Figure 3.tiff", width = 14, height = 10)
 
-
-
-
-ggsave("Outputs and Figures/Figure 3.tiff", width = 14, height = 12)
-
-chgReg %>%
+input %>%
   mutate(Classification = factor(Classification, levels = c("Regional Centre",
                                                             "Major Town Centre",
                                                             "Town Centre", 
                                                             "District Centre",
                                                             "Market Town",
                                                             "Local Centre"))) %>%
-  ggplot(aes(x = WeekDate, y = avgAi, color = Classification)) +
+  ggplot(aes(x = Date, y = Ai, color = Classification)) +
   geom_smooth() +
   scale_color_manual(values = cbp2) +
-  ylab(bquote("Average A"["it"])) +
+  ylab(bquote(bold("A"["it"])))  +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b") +
   geom_vline(xintercept = as.Date("2021-11-27"), color = "red", lwd = 2) +
@@ -274,15 +228,32 @@ chgReg %>%
         legend.title = element_text(size = 14, face = "bold"),
         legend.text.align = 0) +
   facet_wrap(~ Region, scales = "free", ncol = 3)
-ggsave("Outputs and Figures/Figure 4.tiff", width = 14, height = 12)
+ggsave("Outputs and Figures/Figure 4.tiff", width = 16, height = 14)
+
 # 5. Data Visualisation 3) Structural Analysis ----------------------------
 
-## Comparison plot 
-compPlot("propVacant")
-compPlot("eResilience")
-compPlot("pctCloneTown")
-compPlot("AvgIMDScore")
-compPlot("propComparison")
-compPlot("propConvenience")
+### Composition of centres
+t1 <- compPlot("propLeisure")
 
-ggsave("Outputs and Figures/Figure 6.tiff", width = 16, height = 8)
+## Diversity of offer
+t2 <- compPlot("propChain")
+
+### Existing struggles
+t3 <- compPlot("PropStructuralVacant")
+
+ggarrange(t1, t2, t3, nrow = 3, labels = c("A", "B", "C"))
+ggsave("Outputs and Figures/Figure 5.tiff", width = 16, height = 8)
+
+### Deprivation
+t4 <- compPlot("AvgIMDScore")
+
+### e-resilience
+t5 <- compPlot("eResilience")
+
+ggarrange(t4, t5, nrow = 2, labels = c("A", "B"))
+
+### Diversity of offer
+
+
+ggarrange(t4, t5, nrow = 2, labels = c("A", "B"))
+ggsave("Outputs and Figures/Figure 6.tiff", width = 16, height = 12)
