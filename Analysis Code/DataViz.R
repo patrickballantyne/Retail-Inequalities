@@ -233,27 +233,36 @@ ggsave("Outputs and Figures/Figure 4.tiff", width = 16, height = 14)
 # 5. Data Visualisation 3) Structural Analysis ----------------------------
 
 ### Composition of centres
-t1 <- compPlot("propLeisure")
+t1a <- getMajor("propLeisure")
+t1b <- getMinor("propLeisure")
 
 ## Diversity of offer
-t2 <- compPlot("propChain")
+t2a <- getMajor("propChain")
+t2b <- getMinor("propChain")
 
 ### Existing struggles
-t3 <- compPlot("PropStructuralVacant")
+t3a <- getMajor("PropStructuralVacant")
+t3b <- getMinor("PropStructuralVacant")
 
-ggarrange(t1, t2, t3, nrow = 3, labels = c("A", "B", "C"))
-ggsave("Outputs and Figures/Figure 5.tiff", width = 16, height = 8)
-
-### Deprivation
-t4 <- compPlot("AvgIMDScore")
-
-### e-resilience
-t5 <- compPlot("eResilience")
-
-ggarrange(t4, t5, nrow = 2, labels = c("A", "B"))
-
-### Diversity of offer
+ggarrange(t1a, t1b, t2a, t2b, t3a, t3b,
+          nrow = 3, ncol = 2,
+          labels = c("A", "B", "C","D", "E", "F"))
+ggsave("Outputs and Figures/Figure 5.tiff", 
+       width = 14, height = 12)
 
 
-ggarrange(t4, t5, nrow = 2, labels = c("A", "B"))
-ggsave("Outputs and Figures/Figure 6.tiff", width = 16, height = 12)
+### Deprivation 
+t4a <- getMajor("AvgIMDScore")
+t4b <- getMinor("AvgIMDScore")
+
+## e-Resilience
+t5a <- getMajor("eResilience")
+t5b <- getMinor("eResilience")
+
+ggarrange(t4a, t4b, t5a, t5b,
+          nrow = 2, ncol = 2,
+          labels = c("A", "B", "C","D"))
+ggsave("Outputs and Figures/Figure 6.tiff", 
+       width = 14, height = 8)
+
+
