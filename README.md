@@ -21,7 +21,7 @@ We integrate the mobility dataset with the CDRC retail centres data product, spe
 
 Specifically, we examine trends in retail centre activity, calculated as below in the figure.
 
---
+---
 
 ## Methods
 
