@@ -13,6 +13,10 @@ The paper has three aims:
 
 ---
 
+## RGSIBG Annual Conference 2022
+
+This paper was presented at the RGSIBG Annual Conference at Newcastle University in August 2022. You can download my slides [HERE](https://github.com/patrickballantyne/Retail-Inequalities/blob/main/RGS_2022_Slides.pptx). 
+
 ## Data
 
 The primary dataset used in this project is the *Geolytix aggregated in-app location dataset*, which is available via the CDRC; more information can be found [HERE](https://data.cdrc.ac.uk/dataset/geolytix-aggregated-app-location-dataset).
