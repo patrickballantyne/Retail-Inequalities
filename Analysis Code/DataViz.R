@@ -50,7 +50,7 @@ cvDay <- cv %>%
 ## Geolytix Mobility Data ---------
 
 ## Read in and prepare daily measure
-dat <- vroom("Input Data/MobilityAggregates_v3.csv")
+dat <- vroom("Input Data/MobilityAggregates_v4.csv")
 dat <- dat %>%
   mutate(Date = as.Date(Date))
 datDate <- dat %>%
@@ -175,7 +175,7 @@ p3
 
 ## Assemble
 ggarrange(p1, p3, nrow = 2)
-ggsave("Outputs and Figures/Figure 2.tiff", width = 14, height = 12)
+ggsave("Outputs and Figures/NEW FIGURES/Figure 2.tiff", width = 14, height = 12)
 
 # 4. Data Visualisation 2) Functional Analyses and Regions ----------------------------
 
@@ -247,7 +247,7 @@ t3b <- getMinor("PropStructuralVacant")
 ggarrange(t1a, t1b, t2a, t2b, t3a, t3b,
           nrow = 3, ncol = 2,
           labels = c("A", "B", "C","D", "E", "F"))
-ggsave("Outputs and Figures/Figure 5.tiff", 
+ggsave("Outputs and Figures/NEW FIGURES/Figure 5.tiff", 
        width = 14, height = 12)
 
 
@@ -262,7 +262,7 @@ t5b <- getMinor("eResilience")
 ggarrange(t4a, t4b, t5a, t5b,
           nrow = 2, ncol = 2,
           labels = c("A", "B", "C","D"))
-ggsave("Outputs and Figures/Figure 6.tiff", 
+ggsave("Outputs and Figures/NEW FIGURES/Figure 6.tiff", 
        width = 14, height = 8)
 
 
